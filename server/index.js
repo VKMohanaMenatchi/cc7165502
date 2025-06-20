@@ -1,26 +1,23 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs").promises;
-const path = require("path");
+const mongoose = require("mongoose");
+const Event = require("./models/Event"); // Import Mongoose Event model
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const DATA_PATH = path.join(__dirname, "data", "Event.json");
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// Utility functions
-const readEvents = async () => {
-  const data = await fs.readFile(DATA_PATH, "utf-8");
-  return JSON.parse(data);
-};
-
-const writeEvents = async (data) => {
-  await fs.writeFile(DATA_PATH, JSON.stringify(data, null, 2));
-};
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("Connected to MongoDB"))
+  .catch((error) => {
+    console.error("Error connecting to MongoDB:", error);
+    process.exit(1);
+  });
 
 // Root route
 app.get("/", (req, res) => {
@@ -30,19 +27,18 @@ app.get("/", (req, res) => {
 // Get all events
 app.get("/api/events", async (req, res) => {
   try {
-    const events = await readEvents();
+    const events = await Event.find();
     res.json(events);
   } catch (error) {
-    console.error("Error reading events:", error);
-    res.status(500).json({ message: "Error reading event data" });
+    console.error("Error fetching events:", error);
+    res.status(500).json({ message: "Error fetching event data" });
   }
 });
 
 // Get event by ID
 app.get("/api/events/:id", async (req, res) => {
   try {
-    const events = await readEvents();
-    const event = events.find((e) => e.id === parseInt(req.params.id));
+    const event = await Event.findById(req.params.id);
     if (event) {
       res.json(event);
     } else {
@@ -57,16 +53,55 @@ app.get("/api/events/:id", async (req, res) => {
 // Add a new event
 app.post("/api/events", async (req, res) => {
   try {
-    const events = await readEvents();
-    const newEvent = { ...req.body, id: Date.now() };
-    events.push(newEvent);
-    await writeEvents(events);
+    const newEvent = new Event(req.body);
+    await newEvent.save();
     res.status(201).json({ message: "Event added successfully", event: newEvent });
   } catch (error) {
     console.error("Error adding event:", error);
     res.status(500).json({ message: "Failed to add event" });
   }
 });
+
+// Update an existing event
+app.put("/api/events/:id", async (req, res) => {
+  try {
+    const updatedEvent = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (updatedEvent) {
+      res.json({ message: "Event updated successfully", event: updatedEvent });
+    } else {
+      res.status(404).json({ message: "Event not found" });
+    }
+  } catch (error) {
+    console.error("Error updating event:", error);
+    res.status(500).json({ message: "Failed to update event" });
+  }
+});
+
+// Delete an event
+app.delete("/api/events/:id", async (req, res) => {
+  try {
+    const deletedEvent = await Event.findByIdAndDelete(req.params.id);
+    if (deletedEvent) {
+      res.json({ message: "Event deleted successfully" });
+    } else {
+      res.status(404).json({ message: "Event not found" });
+    }
+  } catch (error) {
+    console.error("Error deleting event:", error);
+    res.status(500).json({ message: "Failed to delete event" });
+  }
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
+
 
 // Update an existing event
 app.put("/api/events/:id", async (req, res) => {

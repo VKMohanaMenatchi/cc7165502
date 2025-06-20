@@ -6,20 +6,43 @@ import { useLocation } from "react-router-dom";
 function Home({ sidebarOpen }) {
   const [events, setEvents] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
 
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const searchTerm = searchParams.get("search")?.toLowerCase() || "";
 
+  // Fetch events from backend
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("Event")) || [];
-    setEvents(stored);
+    setLoading(true);
+    fetch(`${import.meta.env.VITE_BACKEND_URL}/api/events`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch events");
+        return res.json();
+      })
+      .then((data) => {
+        setEvents(data);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Error fetching events:", error);
+        setLoading(false);
+      });
   }, []);
 
   const handleDelete = (id) => {
-    const updated = events.filter((e) => e.id !== id);
-    localStorage.setItem("Event", JSON.stringify(updated));
-    setEvents(updated);
+    fetch(`${import.meta.env.VITE_BACKEND_URL}/api/events/${id}`, {
+      method: "DELETE",
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to delete event");
+        // Remove from state on success
+        setEvents((prevEvents) => prevEvents.filter((e) => e.id !== id));
+      })
+      .catch((error) => {
+        console.error("Error deleting event:", error);
+        alert("Failed to delete event. Please try again.");
+      });
   };
 
   const today = new Date().toISOString().split("T")[0];
@@ -43,10 +66,10 @@ function Home({ sidebarOpen }) {
           <p className="text-gray-600 mt-2 text-md">Manage and filter your event list easily.</p>
         </div>
 
-        {filteredEvents.length === 0 ? (
-          <div className="text-gray-500 text-xl text-center py-20">
-            No matching events found.
-          </div>
+        {loading ? (
+          <div className="text-gray-500 text-xl text-center py-20">Loading events...</div>
+        ) : filteredEvents.length === 0 ? (
+          <div className="text-gray-500 text-xl text-center py-20">No matching events found.</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredEvents.map((event) => (
@@ -60,6 +83,72 @@ function Home({ sidebarOpen }) {
 }
 
 export default Home;
+
+
+
+
+// import { useEffect, useState } from "react";
+// import EventCard from "../components/EventCard";
+// import Sidebar from "../components/Sidebar";
+// import { useLocation } from "react-router-dom";
+
+// function Home({ sidebarOpen }) {
+//   const [events, setEvents] = useState([]);
+//   const [filter, setFilter] = useState("all");
+
+//   const location = useLocation();
+//   const searchParams = new URLSearchParams(location.search);
+//   const searchTerm = searchParams.get("search")?.toLowerCase() || "";
+
+//   useEffect(() => {
+//     const stored = JSON.parse(localStorage.getItem("Event")) || [];
+//     setEvents(stored);
+//   }, []);
+
+//   const handleDelete = (id) => {
+//     const updated = events.filter((e) => e.id !== id);
+//     localStorage.setItem("Event", JSON.stringify(updated));
+//     setEvents(updated);
+//   };
+
+//   const today = new Date().toISOString().split("T")[0];
+//   const filteredEvents = events.filter((e) => {
+//     if (searchTerm && !e.Event.toLowerCase().includes(searchTerm) && !e.Venue.toLowerCase().includes(searchTerm)) {
+//       return false;
+//     }
+//     if (filter === "past") return e.Date < today;
+//     if (filter === "today") return e.Date === today;
+//     if (filter === "future") return e.Date > today;
+//     return true;
+//   });
+
+//   return (
+//     <div className="relative min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100">
+//       <Sidebar filter={filter} setFilter={setFilter} isOpen={sidebarOpen} />
+
+//       <div className={`transition-all duration-300 ease-in-out p-6 ${sidebarOpen ? 'ml-64' : ''}`}>
+//         <div className="mb-10 text-center">
+//           <h1 className="text-4xl font-bold text-indigo-700 drop-shadow-lg">🎉 Your Events</h1>
+//           <p className="text-gray-600 mt-2 text-md">Manage and filter your event list easily.</p>
+//         </div>
+
+//         {filteredEvents.length === 0 ? (
+//           <div className="text-gray-500 text-xl text-center py-20">
+//             No matching events found.
+//           </div>
+//         ) : (
+//           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+//             {filteredEvents.map((event) => (
+//               <EventCard key={event.id} Event={event} onDelete={handleDelete} />
+//             ))}
+//           </div>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+// export default Home;
 
 
 
